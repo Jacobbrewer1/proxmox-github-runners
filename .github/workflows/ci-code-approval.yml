@@ -1,0 +1,171 @@
+# This workflow will build a golang project
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-go
+
+name: "Code Approval"
+
+on:
+  merge_group:
+  workflow_dispatch:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+    types:
+      - opened
+      - reopened
+      - synchronize # source branch updated
+
+concurrency:
+  group: '${{ github.workflow }} @ ${{ github.event.pull_request.head.label || github.head_ref || github.ref }}'
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  golang-ci-lint:
+    name: Golangci-lint
+    runs-on: ubuntu-latest
+    steps:
+      # Sets up golang
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ vars.GO_VERSION }}
+          cache-dependency-path: "**/*.sum"
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: "Configure git for private modules"
+        env:
+          GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: git config --global url."https://x:${GITHUB_API_TOKEN}@github.com".insteadOf "https://github.com"
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+          only-new-issues: true
+          args: --verbose --timeout 5m
+
+  openapi-lint:
+    name: OpenAPI Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Hide any previous plan comments from the Pull Request to keep things tidy
+      - id: hide_previous_plan
+        name: Hide previous plan
+        if: github.event_name == 'pull_request'
+        uses: kanga333/comment-hider@master
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          hide_user_name: "github-actions[bot]"
+          hide_reason: "OUTDATED"
+          leave_visible: 0 # leave the last 0 comments visible
+
+      - name: Install IBM OpenAPI Validator
+        run: |
+          npm install -g ibm-openapi-validator
+          npm install @ibm-cloud/openapi-ruleset
+
+      - name: Install JQ
+        run: |
+          sudo apt-get install jq
+
+      - name: Lint OpenAPI
+        shell: bash
+        run: |
+          ./openapi-lint.sh
+
+      - name: Upload the report
+        # Run this step on all PR's even if the linting fails
+        if: ${{ failure() && github.event_name == 'pull_request' }}
+        uses: thollander/actions-comment-pull-request@v2
+        with:
+          # Full file path to the plan output
+          filePath: ${{ github.workspace }}/pr-report.md
+          pr_number: ${{ github.event.pull_request.number }}
+          create_if_not_exists: true
+
+  code-approval:
+    name: "Code Approval"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ vars.GO_VERSION }}
+          cache-dependency-path: "**/*.sum"
+
+      - name: "Configure git for private modules"
+        env:
+          GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: git config --global url."https://x:${GITHUB_API_TOKEN}@github.com".insteadOf "https://github.com"
+
+      - name: Make
+        run: make pr-approval
+
+  api-generation: # Checks to ensure that the API generation is up-to-date
+    name: "API Generation"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ vars.GO_VERSION }}
+          cache-dependency-path: "**/*.sum"
+
+      - name: "Configure git for private modules"
+        env:
+          GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: git config --global url."https://x:${GITHUB_API_TOKEN}@github.com".insteadOf "https://github.com"
+
+      - name: "Run Code Generation"
+        run: make codegen
+
+      - name: "fmt"
+        run: go fmt ./...
+
+      - name: "Check for changes"
+        run: git diff --exit-code
+
+  mock-generation:
+    name: "Mock Generation"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ vars.GO_VERSION }}
+          cache-dependency-path: "**/*.sum"
+
+      - name: "Configure git for private modules"
+        env:
+          GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: git config --global url."https://x:${GITHUB_API_TOKEN}@github.com".insteadOf "https://github.com"
+
+      - name: "Run Mock Generation"
+        run: make mocks
+
+      - name: "fmt"
+        run: go fmt ./...
+
+      # Do not run this is the PR is created by dependabot
+      - name: "Check for changes"
+        run: git diff --exit-code
