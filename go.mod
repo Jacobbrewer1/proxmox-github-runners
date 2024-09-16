@@ -3,9 +3,9 @@ module github.com/Jacobbrewer1/proxmox-github-runners
 go 1.22
 
 require (
-	github.com/hashicorp/vault/api v1.14.0
+	github.com/hashicorp/vault/api v1.15.0
 	github.com/hashicorp/vault/api/auth/approle v0.7.0
-	github.com/hashicorp/vault/api/auth/userpass v0.7.0
+	github.com/hashicorp/vault/api/auth/userpass v0.8.0
 	github.com/spf13/viper v1.19.0
 	github.com/stretchr/testify v1.9.0
 	github.com/vektra/mockery/v2 v2.45.0
@@ -14,7 +14,7 @@ require (
 )
 
 require (
-	github.com/cenkalti/backoff/v3 v3.0.0 // indirect
+	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/chigopher/pathlib v0.19.1 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
