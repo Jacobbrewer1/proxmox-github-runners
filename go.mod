@@ -1,6 +1,7 @@
 module github.com/Jacobbrewer1/proxmox-github-runners
 
 go 1.22
+toolchain go1.23.2
 
 require (
 	github.com/hashicorp/vault/api v1.14.0
@@ -8,7 +9,7 @@ require (
 	github.com/hashicorp/vault/api/auth/userpass v0.7.0
 	github.com/spf13/viper v1.19.0
 	github.com/stretchr/testify v1.9.0
-	github.com/vektra/mockery/v2 v2.45.0
+	github.com/vektra/mockery/v2 v2.46.2
 	golang.org/x/crypto v0.27.0
 	golang.org/x/time v0.6.0
 )
